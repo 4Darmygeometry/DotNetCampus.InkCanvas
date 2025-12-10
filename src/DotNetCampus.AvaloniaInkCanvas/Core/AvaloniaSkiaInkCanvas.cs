@@ -107,6 +107,14 @@ public class AvaloniaSkiaInkCanvas : Control
             // 兼容性处理，如果上次书写没有结束，那就清空好了
             _contextDictionary.Clear();
         }
+
+        if (Context.ShouldUseBitmapCache)
+        {
+            // 开始书写时，禁止使用位图缓存
+            // 防止业务端忘记关闭位图缓存，导致动态笔迹无法正确显示
+            // 由于 UseBitmapCache 里面包含一次 lock 锁，为了性能考虑，这里先判断状态再调用
+            UseBitmapCache(false);
+        }
     }
 
     public void WritingDown(in InkingModeInputArgs args)
