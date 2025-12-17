@@ -107,6 +107,14 @@ public class AvaloniaSkiaInkCanvas : Control
             // 兼容性处理，如果上次书写没有结束，那就清空好了
             _contextDictionary.Clear();
         }
+
+        if (Context.ShouldUseBitmapCache)
+        {
+            // 开始书写时，禁止使用位图缓存
+            // 防止业务端忘记关闭位图缓存，导致动态笔迹无法正确显示
+            // 由于 UseBitmapCache 里面包含一次 lock 锁，为了性能考虑，这里先判断状态再调用
+            UseBitmapCache(false);
+        }
     }
 
     public void WritingDown(in InkingModeInputArgs args)
@@ -200,6 +208,15 @@ public class AvaloniaSkiaInkCanvas : Control
 
         _staticStrokeList.Remove(skiaStroke);
         skiaStroke.InkCanvas = null;
+
+        // 删除笔迹时，关闭位图缓存。这是因为可能存在以下情况：
+        // 1. 第一次绘制时，笔迹 A 和 B 都在，此时有前置的渲染正在进入等待
+        // 2. 用户删除了笔迹 A，设置缓存失效
+        // 3. 此时渲染线程执行第一次绘制，获取的信息是笔迹 A 和 B 都在，生成了缓存
+        // 4. 第二次绘制时，使用了缓存，笔迹 A 仍然显示
+        // 此逻辑无法规避，只能直接在删除笔迹时关闭位图缓存
+        UseBitmapCache(false);
+
         InvalidateVisual();
     }
 
