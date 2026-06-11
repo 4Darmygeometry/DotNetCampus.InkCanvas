@@ -1,4 +1,4 @@
-﻿# DotNetCampus.InkCanvas
+# DotNetCampus.InkCanvas
 
 The InkCanvas control for .NET applications, such as Avalonia, providing a versatile canvas for handwriting and drawing.
 
@@ -175,6 +175,91 @@ You can export the strokes drawn on the `InkCanvas` to an SVG image format. Here
         }
     }
 ```
+
+### Public APIs added in the 4Darmygeometry fork
+
+> The 4Darmygeometry fork keeps 100% API compatibility with upstream `DotNetCampus.AvaloniaInkCanvas`,
+> while making a few additional APIs public so that consumers can do handwriting analysis / Logo playback
+> **without reflection** (which would break AOT / trimming).
+
+#### `SkiaStroke.PointList` — read the raw stylus points (no reflection)
+
+`SkiaStroke.Path` is the **outer contour polygon** used by the Skia renderer. It looks like a stroke but is
+actually a closed ring around the center line, so drawing a poly-line from `Path.Points` will produce a
+hollow, deformed shape.
+
+The real, time-ordered stylus point sequence lives in `SkiaStroke.PointList` (`IReadOnlyList<InkStylusPoint>`).
+In the 4Darmygeometry fork it is exposed as a public property:
+
+```csharp
+using DotNetCampus.Inking;
+using DotNetCampus.Inking.Primitive;
+
+InkCanvas.StrokeCollected += (o, args) =>
+{
+    var stroke = args.SkiaStroke; // SkiaStroke
+    var pts    = stroke.PointList; // IReadOnlyList<InkStylusPoint> — public, AOT-friendly
+
+    foreach (var p in pts)
+    {
+        // p.X, p.Y, p.Pressure, p.Timestamp, ...
+    }
+};
+```
+
+#### Convert handwriting to Logo language source (PCLogo / MSWLogo / AOTLogoSharp 1.2.1+)
+
+The fork ships `DotNetCampus.Inking.LogoExport.InkToLogoConverter` and an `InkCanvas.ToLogoSource(...)`
+extension method. The output is **standard Logo source code** that any Logo interpreter (PCLogo, MSWLogo,
+[AOTLogoSharp](https://www.nuget.org/packages/AOTLogoSharp.Drawing) 1.2.1+) can execute to play back
+the handwriting via a turtle.
+
+Three export modes are supported (selected via `LogoExportMode`):
+
+| Mode | Description |
+|---|---|
+| `Optimized` | Exponential smoothing + RDP simplification + LT/RT relative angles + FD merge (default, smallest output) |
+| `AbsoluteCoordinates` | Pure `SETXY` absolute coordinates, no smoothing / RDP / angles (debug) |
+| `RawRelativeAngles` | Raw points + LT/RT + FD merge, no smoothing / RDP (debug) |
+
+The first two points of every stroke are always preserved (they define the initial `SETH` direction),
+so optimization never changes the stroke's overall direction.
+
+```csharp
+using DotNetCampus.Inking;
+using DotNetCampus.Inking.LogoExport;
+
+// 1) Calculate the bounding box of all strokes and use its center as the Logo origin (0,0)
+var (minX, minY, maxX, maxY) = InkToLogoConverter.GetBoundingBox(InkCanvas.Strokes);
+double cx = (minX + maxX) / 2.0;
+double cy = (minY + maxY) / 2.0;
+
+// 2) Convert to Logo source
+string logo = InkCanvas.ToLogoSource(
+    flipY:         true,            // screen Y points down → Logo Y points up
+    originShiftX:  cx,
+    originShiftY:  cy,
+    mode:          LogoExportMode.Optimized);
+
+// 3) Play back with AOTLogoSharp 1.2.1+ (or PCLogo / MSWLogo)
+File.WriteAllText("handwriting.logo", logo, System.Text.Encoding.UTF8);
+```
+
+You can also convert a single `SkiaStroke` or any `IReadOnlyList<SkiaStroke>` — all three expose a
+`ToLogoSource(...)` extension method with the same parameters.
+
+Logo dialect conventions used by the converter:
+
+| Command | Meaning |
+|---|---|
+| `SETH θ` | Set absolute heading; `0°` = north, clockwise positive; direction = `(sin θ, cos θ)` |
+| `LT a` | Turn left (counter-clockwise) by `a` degrees |
+| `RT a` | Turn right (clockwise) by `a` degrees |
+| `FD d` | Move forward `d` units |
+| `SETXY x y` | Jump to absolute `(x, y)` |
+| `PU` / `PD` | Pen up / pen down |
+| `HOME` | Return to `(0, 0)` with heading `0` |
+| `CS` | Clear screen |
 
 # Contributing
 

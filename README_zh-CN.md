@@ -1,4 +1,4 @@
-﻿# DotNetCampus.InkCanvas
+# DotNetCampus.InkCanvas
 
 书写笔迹画板
 
@@ -163,6 +163,88 @@ internal class CustomEraserView : Control, IEraserView
         }
     }
 ```
+
+### 4Darmygeometry 分支新增的公开 API
+
+> 4Darmygeometry 分支保持与上游 `DotNetCampus.AvaloniaInkCanvas` **100% API 兼容**，
+> 同时把若干私有 API 提升为 public，使得调用方在做笔迹分析 / Logo 语言回放时
+> **无需使用反射**（反射会破坏 AOT / 裁剪发布）。
+
+#### `SkiaStroke.PointList` — 直接读取笔尖原始点列（零反射）
+
+`SkiaStroke.Path` 是 Skia 渲染用的**外轮廓多边形**，看起来像线段，实际上是围绕中心线的封闭多边形，
+直接连 `Path.Points` 会画出空心、变形的笔迹。
+
+真实的、按书写时间排序的笔尖点列保存在 `SkiaStroke.PointList`（`IReadOnlyList<InkStylusPoint>`）。
+4Darmygeometry 分支已将此属性提升为 public：
+
+```csharp
+using DotNetCampus.Inking;
+using DotNetCampus.Inking.Primitive;
+
+InkCanvas.StrokeCollected += (o, args) =>
+{
+    var stroke = args.SkiaStroke; // SkiaStroke
+    var pts    = stroke.PointList; // IReadOnlyList<InkStylusPoint> — public，AOT/裁剪友好
+
+    foreach (var p in pts)
+    {
+        // p.X, p.Y, p.Pressure, p.Timestamp, ...
+    }
+};
+```
+
+#### 将笔迹转换为 Logo 语言源码（PCLogo / MSWLogo / AOTLogoSharp 1.2.1+）
+
+本分支内置 `DotNetCampus.Inking.LogoExport.InkToLogoConverter` 静态类，以及 `InkCanvas.ToLogoSource(...)` 扩展方法。
+输出的是**标准 Logo 源码**，可直接交给任何 Logo 解释器（PCLogo、MSWLogo、
+[AOTLogoSharp](https://www.nuget.org/packages/AOTLogoSharp.Drawing) 1.2.1+）由海龟回放。
+
+支持三种导出模式（通过 `LogoExportMode` 选择）：
+
+| 模式 | 说明 |
+|---|---|
+| `Optimized` | 指数平滑 + RDP 抽稀 + LT/RT 相对转角 + FD 合并（默认，输出最小） |
+| `AbsoluteCoordinates` | 纯 `SETXY` 绝对坐标，不平滑、不 RDP、不算角度（调试用） |
+| `RawRelativeAngles` | 原始点列 + LT/RT + FD 合并，不平滑、不 RDP（调试用） |
+
+**每一笔的前两点始终原样保留**（它们决定了 `SETH` 初始朝向），所以优化过程**不会改变笔画整体方向**。
+
+```csharp
+using DotNetCampus.Inking;
+using DotNetCampus.Inking.LogoExport;
+
+// 1) 计算所有笔迹的包围盒，用中心点作为 Logo 坐标原点 (0,0)
+var (minX, minY, maxX, maxY) = InkToLogoConverter.GetBoundingBox(InkCanvas.Strokes);
+double cx = (minX + maxX) / 2.0;
+double cy = (minY + maxY) / 2.0;
+
+// 2) 转 Logo 源码
+string logo = InkCanvas.ToLogoSource(
+    flipY:         true,            // 屏幕 Y 向下 → Logo Y 向上
+    originShiftX:  cx,
+    originShiftY:  cy,
+    mode:          LogoExportMode.Optimized);
+
+// 3) 用 AOTLogoSharp 1.2.1+（或 PCLogo / MSWLogo）回放
+File.WriteAllText("handwriting.logo", logo, System.Text.Encoding.UTF8);
+```
+
+`SkiaStroke`、`IReadOnlyList<SkiaStroke>`、`InkCanvas` 三者都暴露了同名的 `ToLogoSource(...)` 扩展方法，
+签名一致，可以按需使用。
+
+转换器遵循的 Logo 方言规范：
+
+| 命令 | 含义 |
+|---|---|
+| `SETH θ` | 设定绝对朝向；`0°` = 正北，顺时针增加；方向 = `(sin θ, cos θ)` |
+| `LT a` | 逆时针旋转 `a` 度 |
+| `RT a` | 顺时针旋转 `a` 度 |
+| `FD d` | 沿当前朝向前进 `d` 单位 |
+| `SETXY x y` | 跳到绝对坐标 `(x, y)` |
+| `PU` / `PD` | 抬笔 / 落笔 |
+| `HOME` | 回到 `(0, 0)`，朝向 0° |
+| `CS` | 清屏 |
 
 # 开源社区
 
