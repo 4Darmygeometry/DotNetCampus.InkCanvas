@@ -8,6 +8,9 @@ namespace DotNetCampus.Inking;
 /// 为 <see cref="InkCanvas"/> 和 <see cref="SkiaStroke"/> 提供"笔迹 → Logo 源码"扩展方法。
 /// 该扩展使任何使用 DotNetCampus.AvaloniaInkCanvas 库的应用都能直接调用，无需反射，
 /// 完全兼容 AOT/裁剪发布。
+///
+/// <para><b>6 元配置</b>：本扩展也支持传入 <see cref="LogoExportOptions"/> 覆盖 6 个可调参数
+/// （平滑 α / RDP ε / 最小转角 / 最小步长 / 平滑后最小步长² / 合并 FD 最小长度）。</para>
 /// </summary>
 public static class InkCanvasLogoExtensions
 {
@@ -16,12 +19,9 @@ public static class InkCanvasLogoExtensions
     /// 默认模式：指数平滑 + RDP 抽稀 + LT/RT 相对转角 + FD 合并（kImi 黄金压缩规则）。
     /// </summary>
     /// <param name="inkCanvas">InkCanvas 实例（取其 <see cref="InkCanvas.Strokes"/>）</param>
+    /// <param name="options">6 元可配置参数，null 时取 <see cref="LogoExportOptions.Default"/></param>
     /// <param name="flipY">是否翻转 Y 轴（屏幕 Y 向下 → Logo Y 向上），默认 true</param>
     /// <param name="scale">坐标缩放系数，1.0 表示不缩放</param>
-    /// <param name="minAngleDeg">最小转角阈值（度），过滤抖动；推荐 0.5</param>
-    /// <param name="minStepPx">最小步长阈值（像素），过滤抖动；推荐 0.5</param>
-    /// <param name="smoothAlpha">指数平滑因子 α；&lt;= 0 或 &gt;= 1 表示不平滑；推荐 0.5</param>
-    /// <param name="rdpEpsilon">道格拉斯-普克抽稀阈值 ε（像素），&lt;= 0 表示不抽稀；推荐 0.3</param>
     /// <param name="enableFdMerge">是否合并连续无转角的 FD</param>
     /// <param name="originShiftX">X 方向原点平移量（屏幕坐标）</param>
     /// <param name="originShiftY">Y 方向原点平移量（屏幕坐标）</param>
@@ -29,12 +29,9 @@ public static class InkCanvasLogoExtensions
     /// <returns>Logo 源码字符串，可直接传给 AOTLogoSharp 解析</returns>
     public static string ToLogoSource(
         this InkCanvas inkCanvas,
+        LogoExportOptions? options = null,
         bool flipY = true,
         double scale = 1.0,
-        double minAngleDeg = InkToLogoConverter.MinAngleDeg,
-        double minStepPx = InkToLogoConverter.MinStepPx,
-        double smoothAlpha = InkToLogoConverter.DefaultSmoothAlpha,
-        double rdpEpsilon = InkToLogoConverter.DefaultRdpEpsilon,
         bool enableFdMerge = true,
         double originShiftX = 0.0,
         double originShiftY = 0.0,
@@ -42,8 +39,8 @@ public static class InkCanvasLogoExtensions
     {
         return InkToLogoConverter.Convert(
             inkCanvas.Strokes,
-            flipY, scale, minAngleDeg, minStepPx,
-            smoothAlpha, rdpEpsilon, enableFdMerge,
+            options,
+            flipY, scale, enableFdMerge,
             originShiftX, originShiftY, mode);
     }
 
@@ -51,12 +48,9 @@ public static class InkCanvasLogoExtensions
     /// 把单笔 SkiaStroke 转成标准 Logo 源码。
     /// </summary>
     /// <param name="skiaStroke">单笔 SkiaStroke；其 <see cref="SkiaStroke.PointList"/> 按书写时间排序</param>
+    /// <param name="options">6 元可配置参数，null 时取 <see cref="LogoExportOptions.Default"/></param>
     /// <param name="flipY">是否翻转 Y 轴</param>
     /// <param name="scale">坐标缩放系数</param>
-    /// <param name="minAngleDeg">最小转角阈值（度）</param>
-    /// <param name="minStepPx">最小步长阈值（像素）</param>
-    /// <param name="smoothAlpha">指数平滑因子 α</param>
-    /// <param name="rdpEpsilon">道格拉斯-普克抽稀阈值 ε（像素）</param>
     /// <param name="enableFdMerge">是否合并连续无转角的 FD</param>
     /// <param name="originShiftX">X 方向原点平移量</param>
     /// <param name="originShiftY">Y 方向原点平移量</param>
@@ -64,20 +58,17 @@ public static class InkCanvasLogoExtensions
     /// <returns>Logo 源码字符串</returns>
     public static string ToLogoSource(
         this SkiaStroke skiaStroke,
+        LogoExportOptions? options = null,
         bool flipY = true,
         double scale = 1.0,
-        double minAngleDeg = InkToLogoConverter.MinAngleDeg,
-        double minStepPx = InkToLogoConverter.MinStepPx,
-        double smoothAlpha = InkToLogoConverter.DefaultSmoothAlpha,
-        double rdpEpsilon = InkToLogoConverter.DefaultRdpEpsilon,
         bool enableFdMerge = true,
         double originShiftX = 0.0,
         double originShiftY = 0.0,
         LogoExportMode mode = LogoExportMode.Optimized)
     {
         return InkToLogoConverter.ConvertStroke(
-            skiaStroke, flipY, scale, minAngleDeg, minStepPx,
-            smoothAlpha, rdpEpsilon, enableFdMerge,
+            skiaStroke, options,
+            flipY, scale, enableFdMerge,
             originShiftX, originShiftY, mode);
     }
 
@@ -86,20 +77,17 @@ public static class InkCanvasLogoExtensions
     /// </summary>
     public static string ToLogoSource(
         this IReadOnlyList<SkiaStroke> strokes,
+        LogoExportOptions? options = null,
         bool flipY = true,
         double scale = 1.0,
-        double minAngleDeg = InkToLogoConverter.MinAngleDeg,
-        double minStepPx = InkToLogoConverter.MinStepPx,
-        double smoothAlpha = InkToLogoConverter.DefaultSmoothAlpha,
-        double rdpEpsilon = InkToLogoConverter.DefaultRdpEpsilon,
         bool enableFdMerge = true,
         double originShiftX = 0.0,
         double originShiftY = 0.0,
         LogoExportMode mode = LogoExportMode.Optimized)
     {
         return InkToLogoConverter.Convert(
-            strokes, flipY, scale, minAngleDeg, minStepPx,
-            smoothAlpha, rdpEpsilon, enableFdMerge,
+            strokes, options,
+            flipY, scale, enableFdMerge,
             originShiftX, originShiftY, mode);
     }
 }
