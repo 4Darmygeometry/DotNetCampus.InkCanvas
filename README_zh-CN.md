@@ -14,7 +14,7 @@
 
    ```xml
      <ItemGroup>
-       <PackageReference Include="DotNetCampus.AvaloniaInkCanvas" Version="1.0.0" />
+       <PackageReference Include="DotNetCampus.AvaloniaInkCanvas" Version="1.0.1" />
      </ItemGroup>
    ```
 
@@ -204,11 +204,12 @@ InkCanvas.StrokeCollected += (o, args) =>
 
 | 模式 | 说明 |
 |---|---|
-| `Optimized` | 指数平滑 + RDP 抽稀 + LT/RT 相对转角 + FD 合并（默认，输出最小） |
-| `AbsoluteCoordinates` | 纯 `SETXY` 绝对坐标，不平滑、不 RDP、不算角度（调试用） |
-| `RawRelativeAngles` | 原始点列 + LT/RT + FD 合并，不平滑、不 RDP（调试用） |
+| `Optimized` | 指数平滑 + 曲率抽稀（默认）+ LT/RT 相对转角 + FD 合并（输出最小，1.0.1 推荐） |
+| `AbsoluteCoordinates` | 纯 `SETXY` 绝对坐标，不平滑、不抽稀、不算角度（调试用） |
+| `RawRelativeAngles` | 原始点列 + LT/RT + FD 合并，不平滑、不抽稀（调试用） |
 
-**每一笔的前两点始终原样保留**（它们决定了 `SETH` 初始朝向），所以优化过程**不会改变笔画整体方向**。
+**每一笔的起点、终点、第二个点始终原样保留**（首末点决定整笔的端点，第 2 个点决定 `SETH` 初始朝向），
+所以优化过程**不会改变笔画整体方向**——后续 `RT/LT+FD` 链只是在端点之间的纯几何展开。
 
 ```csharp
 using DotNetCampus.Inking;
@@ -230,8 +231,79 @@ string logo = InkCanvas.ToLogoSource(
 File.WriteAllText("handwriting.logo", logo, System.Text.Encoding.UTF8);
 ```
 
-`SkiaStroke`、`IReadOnlyList<SkiaStroke>`、`InkCanvas` 三者都暴露了同名的 `ToLogoSource(...)` 扩展方法，
-签名一致，可以按需使用。
+`SkiaStroke`、`IReadOnlyList<SkiaStroke>`、`IReadOnlyList<IReadOnlyList<InkStylusPoint>>`
+（点列形式，调用方已有原始笔尖点列时使用）、`InkCanvas` 四者都暴露了同名的
+`ToLogoSource(...)` 扩展方法，签名一致，可以按需使用。
+
+#### 用 `LogoExportOptions` 微调转换器
+
+原先硬编码在 `InkToLogoConverter` 内部的常量（最小转角 / 最小步长 / 平滑 α / 抽稀 ε / 曲率阈值 等）
+已经集中到一个 immutable 的公开配置类 `LogoExportOptions`，用 C# 9 init-only 语法即可覆盖任意一项：
+
+```csharp
+string logo = InkToLogoConverter.Convert(
+    strokes,
+    new LogoExportOptions
+    {
+        SmoothAlpha              = 0.5,   // 指数平滑 α（≤0 / ≥1 = 关闭）
+        CurvatureAngleThresholdDeg = 8.0,  // 曲率抽稀的转角阈值（度）
+        CurvatureMinGapPx        = 4.0,   // 直线段最小间距（像素）
+        MinAngleDeg              = 0.5,   // 低于此角度的转角视为抖动（度）
+        MinStepPx                = 0.5,   // 低于此距离的线段视为抖动（像素）
+        MinMergedFdPx            = 0.5,   // 合并后 FD 低于此长度视为抖动不输出（像素）
+    });
+```
+
+| 选项 | 默认 | 作用 |
+|---|---|---|
+| `SmoothAlpha` | 0.5 | 指数平滑 α；越小越平滑但滞后越大，越大越接近原始点列 |
+| `MinSmoothedStepSq` | 1e-6 | 丢弃平滑后距离平方 < 此值的不动点（像素²） |
+| `CurvatureAngleThresholdDeg` | 8° | 曲率抽稀的转角阈值：夹角 ≥ 此值的拐点必保留 |
+| `CurvatureMinGapPx` | 4 px | 曲率抽稀的直线段最小间距：相邻保留点的距离下限 |
+| `MinAngleDeg` | 0.5 | 低于此角度的转角视为抖动 |
+| `MinStepPx` | 0.5 | 低于此距离的线段视为抖动 |
+| `MinMergedFdPx` | 0.5 | 合并后 FD 低于此长度视为抖动不输出 |
+
+#### 曲率抽稀
+
+转换器使用**曲率抽稀**（不使用 RDP / 距离弦度量）。对每个内部点 P[i] 计算前后两段向量
+（P[i-1]→P[i] 与 P[i]→P[i+1]）的夹角 θ，按下述规则决定保留：
+
+- θ ≥ `CurvatureAngleThresholdDeg` → 视为**拐点**，必保留
+- 否则若与上一个保留点的距离 ≥ `CurvatureMinGapPx` → 视为**直线段等距采样点**，保留
+- 否则丢弃
+
+这种方案对手写笔迹有两个关键保证：
+
+- 每笔的**起点、终点、第 2 个点始终保留**。它们决定了整笔的端点 + `SETH` 初始朝向，
+  所以简化后的笔迹在端点处与 `AbsoluteCoordinates` 输出**位级别一致**。
+- 每笔**只输出一个 `SETH`**，后续是纯 `RT/LT+FD` 链——不存在"周期性 SETH 重置"把一笔连续曲线
+  切成长度不一的折线段的问题。
+
+如果对输出大小不敏感、只追求像素级回放准确度，可以改用 `LogoExportMode.AbsoluteCoordinates`——
+该模式输出纯 `SETXY`，根本没有"旋转"这一概念，端点天然对齐。
+
+#### 点列形式的 `Convert`
+
+点列重载让你**不必构造 `SkiaStroke` 实例**就能转 Logo——当消费方手里已经是
+`InkStylusPoint` 原始点列（例如从 `.meta` 调试文件反序列化得到，或者从录制回放里取出来）时
+特别合适：
+
+```csharp
+IReadOnlyList<IReadOnlyList<InkStylusPoint>> pointLists = /* ... */;
+
+string logo = InkToLogoConverter.Convert(
+    pointLists,
+    options:        new LogoExportOptions(),  // 默认：曲率抽稀 + 不再插多余 SETH
+    flipY:          true,
+    originShiftX:   cx,
+    originShiftY:   cy,
+    mode:           LogoExportMode.Optimized);
+
+var (minX, minY, maxX, maxY) = InkToLogoConverter.GetBoundingBox(pointLists);
+```
+
+`GetBoundingBox` 同样有面向点列的重载，语义与 `SkiaStroke` 版完全一致。
 
 转换器遵循的 Logo 方言规范：
 
