@@ -82,7 +82,7 @@ public static class InkToLogoConverter
     /// <summary>
     /// 笔尖 X 坐标（屏幕坐标，未做 Y 翻转）
     /// </summary>
-    public readonly struct RawPoint
+    private readonly struct RawPoint
     {
         public RawPoint(double x, double y)
         {
