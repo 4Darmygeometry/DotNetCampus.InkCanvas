@@ -164,12 +164,6 @@ internal class CustomEraserView : Control, IEraserView
     }
 ```
 
-### 4Darmygeometry 分支新增的公开 API
-
-> 4Darmygeometry 分支保持与上游 `DotNetCampus.AvaloniaInkCanvas` **100% API 兼容**，
-> 同时把若干私有 API 提升为 public，使得调用方在做笔迹分析 / Logo 语言回放时
-> **无需使用反射**（反射会破坏 AOT / 裁剪发布）。
-
 #### `SkiaStroke.PointList` — 直接读取笔尖原始点列（零反射）
 
 `SkiaStroke.Path` 是 Skia 渲染用的**外轮廓多边形**，看起来像线段，实际上是围绕中心线的封闭多边形，
