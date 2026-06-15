@@ -19,7 +19,7 @@ namespace DotNetCampus.Inking.LogoExport;
 /// <para><b>坐标系约定</b>：</para>
 /// <list type="bullet">
 ///   <item>屏幕坐标：Y 向下，原点在左上角（与 InkCanvas 画布一致）</item>
-///   <item>Logo 坐标：Y 向上，原点在画布中心（AOTLogoSharp Turtle 默认）</item>
+///   <item>Logo 坐标：Y 向上，原点在画布中心</item>
 /// </list>
 ///
 /// <para>
@@ -36,7 +36,7 @@ namespace DotNetCampus.Inking.LogoExport;
 ///   <item><b><see cref="LogoExportMode.AbsoluteCoordinates"/></b>：纯 SETXY 绝对坐标连线，
 ///         不优化、不算角度（用于排查"RT/LT 角度错"还是"平滑丢细节"导致变形）</item>
 ///   <item><b><see cref="LogoExportMode.RawRelativeAngles"/></b>：保留原始点列 + LT/RT 相对转角 +
-///         FD 合并（**不**平滑、**不**抽稀，用于隔离排查"平滑丢细节"vs"RT/LT 角度算错"）</item>
+///         FD 合并（不平滑、不抽稀，用于隔离排查"平滑丢细节"vs"RT/LT 角度算错"）</item>
 /// </list>
 ///
 /// <para><b>可配置参数</b>（详见 <see cref="LogoExportOptions"/>）：</para>
