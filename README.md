@@ -176,12 +176,6 @@ You can export the strokes drawn on the `InkCanvas` to an SVG image format. Here
     }
 ```
 
-### Public APIs added in the 4Darmygeometry fork
-
-> The 4Darmygeometry fork keeps 100% API compatibility with upstream `DotNetCampus.AvaloniaInkCanvas`,
-> while making a few additional APIs public so that consumers can do handwriting analysis / Logo playback
-> **without reflection** (which would break AOT / trimming).
-
 #### `SkiaStroke.PointList` — read the raw stylus points (no reflection)
 
 `SkiaStroke.Path` is the **outer contour polygon** used by the Skia renderer. It looks like a stroke but is
