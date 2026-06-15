@@ -32,13 +32,13 @@
 
   <!-- Package and project properties -->
   <PropertyGroup>
-    <Description>DotNetCampus.AvaloniaInkCanvas 是基于 Skia 的 Avalonia 笔迹画布；本分支由 4Darmygeometry 维护，公开了 SkiaStroke 的笔尖原始点列 PointList，并内置标准 Logo 语言（PCLogo / MSWLogo / AOTLogoSharp 1.2.1+）转换功能（支持 .logo / .abs.logo / .raw.logo 三种导出形式），完全兼容 AOT/裁剪发布。</Description>
-    <Company>dotnet campus（.NET职业技术学院）,4Darmygeometry</Company>
-    <Authors>dotnet-campus,4Darmygeometry</Authors>
-    <Copyright>Copyright © 2026 4Darmygeometry, MIT License.</Copyright>
+    <Description>The InkCanvas</Description>
+    <Company>dotnet campus（.NET 职业技术学院）</Company>
+    <Authors>dotnet-campus</Authors>
+    <Copyright>Copyright © 2023-$(ThisYear) dotnet campus, All Rights Reserved.</Copyright>
     <RepositoryType>git</RepositoryType>
-    <RepositoryUrl>https://github.com/4Darmygeometry/DotNetCampus.InkCanvas</RepositoryUrl>
-    <PackageProjectUrl>https://github.com/4Darmygeometry/DotNetCampus.InkCanvas</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/dotnet-campus/DotNetCampus.InkCanvas</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/dotnet-campus/DotNetCampus.InkCanvas</PackageProjectUrl>
     <IsPackable>false</IsPackable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <EmbedAllSources Condition="'$(Configuration)' != 'Debug'">true</EmbedAllSources>
