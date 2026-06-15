@@ -7,7 +7,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <IsPackable>true</IsPackable>
     <AssemblyName>DotNetCampus.AvaloniaInkCanvas</AssemblyName>
-    <PackageId>4Darmygeometry.AvaloniaInkCanvas</PackageId>
+    <PackageId>DotNetCampus.AvaloniaInkCanvas</PackageId>
     <RootNamespace>DotNetCampus.Inking</RootNamespace>
     <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
