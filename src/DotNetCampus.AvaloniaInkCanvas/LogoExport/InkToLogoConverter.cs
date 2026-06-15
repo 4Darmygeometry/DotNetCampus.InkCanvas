@@ -162,7 +162,7 @@ public static class InkToLogoConverter
     {
         if (strokes == null || strokes.Count == 0)
         {
-            return "; (空笔迹：无笔触)\nHOME\n";
+            return "HOME\n";
         }
 
         // 拆掉 SkiaStroke 外壳，只把内部点列交给统一调度（避免代码重复）
@@ -199,7 +199,7 @@ public static class InkToLogoConverter
         double originShiftY = 0.0,
         LogoExportMode mode = LogoExportMode.Optimized)
     {
-        if (strokes == null) return "; (空笔迹：无笔触)\nHOME\n";
+        if (strokes == null) return "HOME\n";
         return ConvertPointLists(strokes, options ?? LogoExportOptions.Default, flipY, scale, enableFdMerge, originShiftX, originShiftY, mode);
     }
 
@@ -219,20 +219,10 @@ public static class InkToLogoConverter
     {
         if (strokes == null || strokes.Count == 0)
         {
-            return "; (空笔迹：无笔触)\nHOME\n";
+            return "HOME\n";
         }
 
         var sb = new StringBuilder();
-        sb.AppendLine("; ===== 由 InkToLogoConverter 生成的 Logo 源 =====");
-        sb.AppendLine($"; 笔触数: {strokes.Count}");
-        sb.AppendLine($"; 模式: {DescribeMode(mode)}");
-        if (mode != LogoExportMode.AbsoluteCoordinates)
-        {
-            sb.AppendLine($"; 角度算法: 最近三点法（叉积/点积求相对转角）");
-            sb.AppendLine($"; 指数平滑 α: {(mode == LogoExportMode.RawRelativeAngles ? "关闭（保留原始点列）" : (IsValidAlpha(effectiveOptions.SmoothAlpha) ? effectiveOptions.SmoothAlpha.ToString("0.##", CultureInfo.InvariantCulture) : "关闭"))}");
-            sb.AppendLine($"; 曲率抽稀: {(mode == LogoExportMode.RawRelativeAngles ? "关闭（保留原始点列）" : CurvatureDescription(effectiveOptions))}");
-            sb.AppendLine($"; FD 合并: {(enableFdMerge ? "开启" : "关闭")}");
-        }
         sb.AppendLine("CS");
         sb.AppendLine("PU");
         sb.AppendLine("HOME");
@@ -258,7 +248,6 @@ public static class InkToLogoConverter
             sb.Append(strokeLogo);
         }
 
-        sb.AppendLine("; ===== 结束 =====");
         return sb.ToString();
     }
 
@@ -387,7 +376,6 @@ public static class InkToLogoConverter
         var startX = (first.X - originShiftX) * scale;
         var startYRaw = first.Y - originShiftY;
         var startY = flipY ? -startYRaw * scale : startYRaw * scale;
-        sb.AppendLine($"; --- 笔 {strokeIndex + 1}/{totalStrokes}（原始 {originalCount} 点 / 优化后 {workPoints.Count} 点）---");
         sb.AppendLine($"SETXY {Fmt(startX)} {Fmt(startY)}");
         sb.AppendLine("PD");
 
@@ -687,7 +675,7 @@ private static string CurvatureDescription(LogoExportOptions options)
         return mode switch
         {
             LogoExportMode.AbsoluteCoordinates => "SETXY 绝对坐标调试（不优化、不算角度）",
-            LogoExportMode.RawRelativeAngles => "RT/LT 相对转角 + FD 合并（**不**平滑、**不**抽稀）",
+            LogoExportMode.RawRelativeAngles => "RT/LT 相对转角 + FD 合并（不平滑、不抽稀）",
             _ => "RT/LT 相对转角 + 平滑 + 曲率抽稀 + FD 合并"
         };
     }
